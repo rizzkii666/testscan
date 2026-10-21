@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PustakaSMP - Pendataan Buku</title>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0f2f5; color: #333; font-size: 16px; line-height: 1.5;
+      -webkit-text-size-adjust: 100%;
+    }
+    nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: #fff; border-top: 1px solid #ddd;
+      display: flex; justify-content: space-around; padding: 8px 0; z-index: 1000;
+    }
+    nav button {
+      background: none; border: none; font-size: 13px; color: #666;
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 4px 16px; cursor: pointer;
+    }
+    nav button svg { width: 24px; height: 24px; }
+    nav button.aktif { color: #1976d2; font-weight: 600; }
+    .halaman {
+      display: none; padding: 16px 16px 90px 16px;
+      max-width: 600px; margin: 0 auto; min-height: 100vh;
+    }
+    .halaman.aktif { display: block; }
+    h1 { font-size: 20px; margin-bottom: 16px; color: #1976d2; }
+    h2 { font-size: 18px; margin: 16px 0 8px; }
+    .kartu {
+      background: #fff; border-radius: 12px; padding: 16px;
+      margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    label { display: block; margin: 12px 0 4px; font-weight: 500; font-size: 14px; }
+    input, select {
+      width: 100%; padding: 12px; border: 1px solid #ccc;
+      border-radius: 8px; font-size: 16px; background: #fff;
+    }
+    input:focus, select:focus { outline: none; border-color: #1976d2; }
+    input:disabled, select:disabled { background: #f5f5f5; color: #666; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 100%; padding: 14px; border: none; border-radius: 10px;
+      font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 12px;
+      gap: 8px; min-height: 48px;
+    }
+    .btn-primer { background: #1976d2; color: #fff; }
+    .btn-primer:active { background: #1565c0; }
+    .btn-sukses { background: #2e7d32; color: #fff; }
+    .btn-sukses:active { background: #1b5e20; }
+    .btn-bahaya { background: #c62828; color: #fff; }
+    .btn-sekunder { background: #e3f2fd; color: #1976d2; }
+    #area-scan {
+      display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: #000; z-index: 2000; flex-direction: column;
+    }
+    #area-scan.aktif { display: flex; }
+    #reader { flex: 1; width: 100%; }
+    #reader video { width: 100% !important; height: 100% !important; object-fit: cover; }
+    .scan-overlay {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%); width: 260px; height: 160px;
+      border: 3px solid #4caf50; border-radius: 8px; pointer-events: none;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);
+    }
+    .scan-teks {
+      position: absolute; bottom: 100px; left: 0; right: 0;
+      text-align: center; color: #fff; font-size: 14px; padding: 0 20px;
+    }
+    .scan-tutup {
+      position: absolute; top: 16px; right: 16px;
+      background: rgba(255,255,255,0.2); color: #fff; border: none;
+      padding: 10px 16px; border-radius: 8px; font-size: 14px;
+      cursor: pointer; z-index: 2001;
+    }
+    .pesan {
+      padding: 12px; border-radius: 8px; margin-bottom: 12px;
+      font-size: 14px; display: none;
+    }
+    .pesan.aktif { display: block; }
+    .pesan-info { background: #e3f2fd; color: #1565c0; }
+    .pesan-sukses { background: #e8f5e9; color: #2e7d32; }
+    .pesan-error { background: #ffebee; color: #c62828; }
+    .pesan-peringatan { background: #fff3e0; color: #ef6c00; }
+    .tabel-container {
+      overflow-x: auto; background: #fff; border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; white-space: nowrap; }
+    th { background: #f5f5f5; font-weight: 600; position: sticky; top: 0; }
+    tr:last-child td { border-bottom: none; }
+    .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 12px; }
+    .stat-kartu { background: #fff; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .stat-angka { font-size: 24px; font-weight: 700; color: #1976d2; }
+    .stat-label { font-size: 12px; color: #666; margin-top: 4px; }
+    #modal-overlay {
+      display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5); z-index: 3000;
+      align-items: center; justify-content: center; padding: 20px;
+    }
+    #modal-overlay.aktif { display: flex; }
+    .modal-konten { background: #fff; border-radius: 16px; padding: 24px; width: 100%; max-width: 360px; text-align: center; }
+    .modal-konten h3 { margin-bottom: 12px; }
+    .modal-konten p { color: #666; margin-bottom: 20px; font-size: 14px; }
+    .modal-tombol { display: flex; gap: 10px; }
+    .modal-tombol .btn { margin-top: 0; flex: 1; }
+    .grup-input { display: flex; gap: 8px; }
+    .grup-input input { flex: 1; }
+    .grup-input .btn { width: auto; margin-top: 0; padding: 12px 16px; }
+    .keterangan-kecil { font-size: 12px; color: #888; margin-top: 4px; }
+    .loader { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: putar 0.8s linear infinite; }
+    @keyframes putar { to { transform: rotate(360deg); } }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <div id="hal-input" class="halaman aktif">
+    <h1>Tambah Buku Baru</h1>
+    <div id="pesan" class="pesan"></div>
+    <div class="kartu">
+      <button id="btn-scan" class="btn btn-primer" onclick="bukaScanner()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M2 12h20M12 2v20"/></svg>
+        Scan Barcode ISBN
+      </button>
+      <p class="keterangan-kecil">Arahkan kamera ke barcode di belakang buku.</p>
+    </div>
+    <div class="kartu">
+      <h2>Data Buku</h2>
+      <label for="isbn">ISBN</label>
+      <div class="grup-input">
+        <input type="text" id="isbn" placeholder="978xxxxxxxxx" maxlength="17" inputmode="numeric">
+        <button class="btn btn-sekunder" onclick="cariManual()" style="width:auto;margin-top:0;padding:12px;">Cari</button>
+      </div>
+      <p class="keterangan-kecil">ISBN biasanya 10 atau 13 digit. Boleh pakai strip atau tanpa strip.</p>
+      <label for="judul">Judul Buku</label>
+      <input type="text" id="judul" placeholder="Masukkan judul buku">
+      <label for="penulis">Penulis</label>
+      <input type="text" id="penulis" placeholder="Nama penulis">
+      <label for="penerbit">Penerbit</label>
+      <input type="text" id="penerbit" placeholder="Nama penerbit">
+      <label for="tahun">Tahun Terbit</label>
+      <input type="number" id="tahun" placeholder="2020" min="1900" max="2099">
+      <label for="mapel">Mata Pelajaran</label>
+      <select id="mapel">
+        <option value="">-- Pilih Mapel --</option>
+        <option>Bahasa Indonesia</option>
+        <option>Matematika</option>
+        <option>IPA</option>
+        <option>IPS</option>
+        <option>Bahasa Inggris</option>
+        <option>PPKn</option>
+        <option>Seni Budaya</option>
+        <option>PJOK</option>
+        <option>Prakarya</option>
+        <option>Agama</option>
+        <option>Lainnya</option>
+      </select>
+      <label for="kelas">Kelas</label>
+      <select id="kelas">
+        <option value="">-- Pilih Kelas --</option>
+        <option>7</option>
+        <option>8</option>
+        <option>9</option>
+      </select>
+      <label for="jumlah">Jumlah Eksemplar</label>
+      <input type="number" id="jumlah" value="1" min="1" max="99">
+      <label for="nomor-induk-awal">Nomor Induk Awal</label>
+      <input type="text" id="nomor-induk-awal" placeholder="Contoh: 001">
+      <p class="keterangan-kecil">Nomor induk untuk eksemplar pertama. Selanjutnya otomatis bertambah.</p>
+      <button id="btn-simpan" class="btn btn-sukses" onclick="simpanBuku()">Simpan ke Koleksi</button>
+      <button class="btn btn-sekunder" onclick="resetForm()" style="margin-top:8px;">Reset Form</button>
+    </div>
+  </div>
+
+  <div id="hal-koleksi" class="halaman">
+    <h1>Daftar Koleksi Buku</h1>
+    <div class="stat-grid">
+      <div class="stat-kartu"><div class="stat-angka" id="stat-judul">0</div><div class="stat-label">Judul Unik</div></div>
+      <div class="stat-kartu"><div class="stat-angka" id="stat-total">0</div><div class="stat-label">Total Eksemplar</div></div>
+    </div>
+    <div class="kartu" style="padding:10px;">
+      <input type="text" id="cari-koleksi" placeholder="Cari judul, penulis, atau ISBN..." oninput="renderKoleksi()">
+    </div>
+    <button class="btn btn-primer" onclick="eksporCSV()" style="margin-bottom:12px;">Ekspor ke CSV</button>
+    <div class="tabel-container">
+      <table>
+        <thead>
+          <tr><th>No. Induk</th><th>ISBN</th><th>Judul</th><th>Penulis</th><th>Kelas</th><th>Mapel</th></tr>
+        </thead>
+        <tbody id="tabel-koleksi">
+          <tr><td colspan="6" style="text-align:center;color:#888;">Belum ada data</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="area-scan">
+    <button class="scan-tutup" onclick="tutupScanner()">Tutup</button>
+    <div id="reader"></div>
+    <div class="scan-overlay"></div>
+    <div class="scan-teks">Arahkan barcode ke dalam kotak hijau</div>
+  </div>
+
+  <div id="modal-overlay">
+    <div class="modal-konten">
+      <h3 id="modal-judul">Konfirmasi</h3>
+      <p id="modal-pesan">Pesan modal</p>
+      <div class="modal-tombol">
+        <button id="modal-batal" class="btn btn-sekunder">Batal</button>
+        <button id="modal-ok" class="btn btn-primer">Ya</button>
+      </div>
+    </div>
+  </div>
+
+  <nav>
+    <button id="nav-input" class="aktif" onclick="gantiHalaman('input')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      Input
+    </button>
+    <button id="nav-koleksi" onclick="gantiHalaman('koleksi')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+      Koleksi
+    </button>
+  </nav>
+
+  <script>
+    const KEY_TABEL_INDUK = 'pustaka_tabelInduk';
+    const KEY_KOLEKSI     = 'pustaka_koleksi';
+    let scanner = null;
+    let sedangMemproses = false;
+
+    function ambilData(key) {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        console.error('Gagal baca localStorage:', e);
+        return [];
+      }
+    }
+    function simpanData(key, data) {
+      try {
+        localStorage.setItem(key, JSON.stringify(data));
+      } catch (e) {
+        console.error('Gagal simpan localStorage:', e);
+        tampilPesan('error', 'Gagal menyimpan data. Penyimpanan penuh?');
+      }
+    }
+
+    function tampilPesan(tipe, teks) {
+      const el = document.getElementById('pesan');
+      el.className = 'pesan pesan-' + tipe + ' aktif';
+      el.textContent = teks;
+      setTimeout(() => { el.classList.remove('aktif'); }, 5000);
+    }
+    function gantiHalaman(nama) {
+      document.querySelectorAll('.halaman').forEach(el => el.classList.remove('aktif'));
+      document.querySelectorAll('nav button').forEach(el => el.classList.remove('aktif'));
+      document.getElementById('hal-' + nama).classList.add('aktif');
+      document.getElementById('nav-' + nama).classList.add('aktif');
+      if (nama === 'koleksi') renderKoleksi();
+    }
+    function tanya(pesan) {
+      return new Promise((resolve) => {
+        const overlay = document.getElementById('modal-overlay');
+        document.getElementById('modal-pesan').textContent = pesan;
+        overlay.classList.add('aktif');
+        const btnOk = document.getElementById('modal-ok');
+        const btnBatal = document.getElementById('modal-batal');
+        const bersihkan = () => {
+          overlay.classList.remove('aktif');
+          btnOk.onclick = null;
+          btnBatal.onclick = null;
+        };
+        btnOk.onclick = () => { bersihkan(); resolve(true); };
+        btnBatal.onclick = () => { bersihkan(); resolve(false); };
+      });
+    }
+
+    function bersihkanISBN(isbn) {
+      return isbn.replace(/[s-]/g, '');
+    }
+    function isISBNValid(isbn) {
+      const bersih = bersihkanISBN(isbn);
+      return bersih.length === 10 || bersih.length === 13;
+    }
+
+    async function bukaScanner() {
+      document.getElementById('area-scan').classList.add('aktif');
+      try {
+        scanner = new Html5Qrcode('reader');
+        await scanner.start(
+          { facingMode: 'environment' },
+          {
+            fps: 10,
+            qrbox: { width: 260, height: 160 },
+            formatsToSupport: [
+              Html5QrcodeSupportedFormats.EAN_13,
+              Html5QrcodeSupportedFormats.EAN_10,
+              Html5QrcodeSupportedFormats.UPC_A,
+              Html5QrcodeSupportedFormats.UPC_E
+            ]
+          },
+          onScanBerhasil,
+          onScanError
+        );
+      } catch (err) {
+        console.error('Gagal buka scanner:', err);
+        tutupScanner();
+        if (err.name === 'NotAllowedError' || err.message?.includes('Permission')) {
+          tampilPesan('error', 'Izin kamera ditolak. Buka pengaturan browser dan izinkan kamera.');
+        } else if (err.name === 'NotFoundError') {
+          tampilPesan('error', 'Kamera tidak ditemukan. Pastikan HP memiliki kamera belakang.');
+        } else {
+          tampilPesan('error', 'Gagal membuka kamera: ' + err.message);
+        }
+      }
+    }
+    async function tutupScanner() {
+      if (scanner) {
+        try { await scanner.stop(); } catch (e) {}
+        scanner = null;
+      }
+      document.getElementById('area-scan').classList.remove('aktif');
+    }
+    async function onScanBerhasil(isbn) {
+      if (sedangMemproses) return;
+      sedangMemproses = true;
+      console.log('ISBN terdeteksi:', isbn);
+      await tutupScanner();
+      document.getElementById('isbn').value = isbn;
+      tampilPesan('info', 'ISBN terbaca: ' + isbn + '. Mencari data...');
+      await prosesISBN(isbn);
+      sedangMemproses = false;
+    }
+    function onScanError(errorMessage) {
+      // Abaikan error frame kosong
+    }
+
+    async function cariManual() {
+      const isbn = document.getElementById('isbn').value.trim();
+      if (!isbn) { tampilPesan('peringatan', 'Masukkan ISBN terlebih dahulu.'); return; }
+      if (!isISBNValid(isbn)) { tampilPesan('peringatan', 'ISBN tidak valid. Periksa kembali (10 atau 13 digit).'); return; }
+      await prosesISBN(isbn);
+    }
+    async function prosesISBN(isbn) {
+      const bersih = bersihkanISBN(isbn);
+      const induk = ambilData(KEY_TABEL_INDUK);
+      const adaLokal = induk.find(b => bersihkanISBN(b.isbn) === bersih);
+      if (adaLokal) {
+        isiForm(adaLokal);
+        tampilPesan('sukses', 'Data ditemukan di database lokal!');
+        return;
+      }
+      tampilPesan('info', 'Mencari ke Google Books API...');
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const res = await fetch('https://www.googleapis.com/books/v1/volumes?q=isbn:' + bersih, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        if (data.totalItems > 0 && data.items && data.items.length > 0) {
+          const vol = data.items[0].volumeInfo;
+          isiForm({
+            isbn: isbn,
+            judul: vol.title || '',
+            penulis: (vol.authors || []).join(', '),
+            penerbit: vol.publisher || '',
+            tahun: (vol.publishedDate || '').substring(0, 4)
+          });
+          tampilPesan('sukses', 'Data ditemukan dari Google Books!');
+        } else {
+          throw new Error('Buku tidak ditemukan di Google Books');
+        }
+      } catch (err) {
+        console.error('Gagal fetch Google Books:', err);
+        if (err.name === 'AbortError' || err.name === 'TypeError') {
+          tampilPesan('peringatan', 'Koneksi internet terputus atau lambat. Silakan isi data manual.');
+        } else {
+          tampilPesan('peringatan', 'Data tidak ditemukan. Silakan isi data manual.');
+        }
+        document.getElementById('judul').focus();
+      }
+    }
+    function isiForm(data) {
+      if (data.isbn) document.getElementById('isbn').value = data.isbn;
+      if (data.judul) document.getElementById('judul').value = data.judul;
+      if (data.penulis) document.getElementById('penulis').value = data.penulis;
+      if (data.penerbit) document.getElementById('penerbit').value = data.penerbit;
+      if (data.tahun) document.getElementById('tahun').value = data.tahun;
+    }
+    function resetForm() {
+      document.getElementById('isbn').value = '';
+      document.getElementById('judul').value = '';
+      document.getElementById('penulis').value = '';
+      document.getElementById('penerbit').value = '';
+      document.getElementById('tahun').value = '';
+      document.getElementById('mapel').value = '';
+      document.getElementById('kelas').value = '';
+      document.getElementById('jumlah').value = '1';
+      document.getElementById('nomor-induk-awal').value = '';
+      document.getElementById('pesan').classList.remove('aktif');
+    }
+
+    async function simpanBuku() {
+      const isbnRaw = document.getElementById('isbn').value.trim();
+      const judul = document.getElementById('judul').value.trim();
+      const penulis = document.getElementById('penulis').value.trim();
+      const penerbit = document.getElementById('penerbit').value.trim();
+      const tahun = document.getElementById('tahun').value.trim();
+      const mapel = document.getElementById('mapel').value;
+      const kelas = document.getElementById('kelas').value;
+      const jumlah = parseInt(document.getElementById('jumlah').value) || 1;
+      const nomorIndukAwal = document.getElementById('nomor-induk-awal').value.trim();
+
+      if (!isbnRaw) { tampilPesan('error', 'ISBN wajib diisi.'); return; }
+      if (!isISBNValid(isbnRaw)) { tampilPesan('error', 'ISBN tidak valid (10/13 digit).'); return; }
+      if (!judul) { tampilPesan('error', 'Judul wajib diisi.'); return; }
+      if (!mapel) { tampilPesan('error', 'Pilih mata pelajaran.'); return; }
+      if (!kelas) { tampilPesan('error', 'Pilih kelas.'); return; }
+      if (!nomorIndukAwal) { tampilPesan('error', 'Nomor induk awal wajib diisi.'); return; }
+      if (jumlah < 1) { tampilPesan('error', 'Jumlah eksemplar minimal 1.'); return; }
+
+      const isbnBersih = bersihkanISBN(isbnRaw);
+      let induk = ambilData(KEY_TABEL_INDUK);
+      const indexAda = induk.findIndex(b => bersihkanISBN(b.isbn) === isbnBersih);
+      const sudahAda = indexAda !== -1;
+
+      if (sudahAda) {
+        const lanjut = await tanya('Buku dengan ISBN ini sudah ada di database. Apakah ingin menambah eksemplar saja?');
+        if (!lanjut) return;
+        induk[indexAda] = { isbn: isbnRaw, judul, penulis, penerbit, tahun, mapel, kelas };
+      } else {
+        induk.push({ isbn: isbnRaw, judul, penulis, penerbit, tahun, mapel, kelas });
+      }
+      simpanData(KEY_TABEL_INDUK, induk);
+
+      let koleksi = ambilData(KEY_KOLEKSI);
+      for (let i = 0; i < jumlah; i++) {
+        let noInduk = nomorIndukAwal;
+        if (jumlah > 1) noInduk = nomorIndukAwal + '.' + (i + 1);
+        koleksi.push({
+          id: Date.now() + '_' + i,
+          isbn: isbnRaw,
+          nomorInduk: noInduk,
+          status: 'tersedia',
+          tanggalInput: new Date().toISOString()
+        });
+      }
+      simpanData(KEY_KOLEKSI, koleksi);
+
+      // Kirim ke Google Sheets per eksemplar
+      for (let i = 0; i < jumlah; i++) {
+        let noInduk = nomorIndukAwal;
+        if (jumlah > 1) noInduk = nomorIndukAwal + '.' + (i + 1);
+        simpanKeSheets({
+          isbn: isbnRaw,
+          judul,
+          penulis,
+          penerbit,
+          tahun,
+          mapel,
+          kelas,
+          nomorInduk: noInduk
+        });
+      }
+
+      tampilPesan('sukses', sudahAda ? jumlah + ' eksemplar berhasil ditambahkan!' : 'Buku baru berhasil disimpan!');
+      resetForm();
+    }
+    // ============================================================
+    // KONFIGURASI WEB APP GOOGLE APPS SCRIPT
+    // GANTI URL DI BAWAH INI SETELAH DEPLOY WEB APP
+    // ============================================================
+    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxfLNKxchGbBiweg3K_913xIkrHG1NlEn2DAKS4rA-wtL-n9ZbA2twVtjYgOs69gXEL/exec';
+
+    async function simpanKeSheets(data) {
+      console.log('[Google Sheets] Data yang akan dikirim:', data);
+
+      // Cek apakah URL sudah diganti
+      if (WEB_APP_URL.includes('XXXXXXXX')) {
+        console.warn('[Google Sheets] Web App URL belum dikonfigurasi. Data hanya tersimpan lokal.');
+        return;
+      }
+
+      try {
+        const payload = {
+          isbn: data.isbn || '',
+          judul: data.judul || '',
+          penulis: data.penulis || '',
+          penerbit: data.penerbit || '',
+          tahun: data.tahun || '',
+          mapel: data.mapel || '',
+          kelas: data.kelas || '',
+          nomorInduk: data.nomorInduk || ''
+        };
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+        const res = await fetch(WEB_APP_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+          mode: 'cors'
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+          throw new Error('HTTP ' + res.status);
+        }
+
+        const result = await res.json();
+        if (result.status === 'duplicate') {
+          console.warn('[Google Sheets] Duplikat di sheet:', result.message);
+        } else if (result.status === 'ok') {
+          console.log('[Google Sheets] Sukses:', result.message);
+        } else {
+          console.error('[Google Sheets] Gagal:', result.message);
+        }
+      } catch (err) {
+        console.error('[Google Sheets] Gagal kirim:', err.message);
+        // Data tetap tersimpan di localStorage, tidak perlu panic
+      }
+    }
+
+    function renderKoleksi() {
+      const koleksi = ambilData(KEY_KOLEKSI);
+      const induk = ambilData(KEY_TABEL_INDUK);
+      const keyword = document.getElementById('cari-koleksi').value.toLowerCase().trim();
+      document.getElementById('stat-judul').textContent = induk.length;
+      document.getElementById('stat-total').textContent = koleksi.length;
+      const tbody = document.getElementById('tabel-koleksi');
+      tbody.innerHTML = '';
+      if (koleksi.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888;">Belum ada data</td></tr>';
+        return;
+      }
+      const hasil = koleksi.filter(item => {
+        if (!keyword) return true;
+        const buku = induk.find(b => bersihkanISBN(b.isbn) === bersihkanISBN(item.isbn));
+        const teks = [item.isbn, item.nomorInduk, buku?.judul || '', buku?.penulis || '', buku?.mapel || '', buku?.kelas || ''].join(' ').toLowerCase();
+        return teks.includes(keyword);
+      });
+      if (hasil.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888;">Tidak ditemukan</td></tr>';
+        return;
+      }
+      hasil.slice(0, 200).forEach(item => {
+        const buku = induk.find(b => bersihkanISBN(b.isbn) === bersihkanISBN(item.isbn));
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td>' + escapeHtml(item.nomorInduk) + '</td><td>' + escapeHtml(item.isbn) + '</td><td>' + escapeHtml(buku?.judul || '?') + '</td><td>' + escapeHtml(buku?.penulis || '?') + '</td><td>' + escapeHtml(buku?.kelas || '?') + '</td><td>' + escapeHtml(buku?.mapel || '?') + '</td>';
+        tbody.appendChild(tr);
+      });
+      if (hasil.length > 200) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td colspan="6" style="text-align:center;color:#888;">... dan ' + (hasil.length - 200) + ' data lainnya</td>';
+        tbody.appendChild(tr);
+      }
+    }
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function eksporCSV() {
+      const koleksi = ambilData(KEY_KOLEKSI);
+      const induk = ambilData(KEY_TABEL_INDUK);
+      if (koleksi.length === 0) { tampilPesan('peringatan', 'Tidak ada data untuk diekspor.'); return; }
+      const header = ['No. Induk', 'ISBN', 'Judul', 'Penulis', 'Penerbit', 'Tahun', 'Kelas', 'Mapel', 'Status', 'Tanggal Input'];
+      const baris = [header.join(',')];
+      koleksi.forEach(item => {
+        const buku = induk.find(b => bersihkanISBN(b.isbn) === bersihkanISBN(item.isbn));
+        baris.push([
+          csvCell(item.nomorInduk), csvCell(item.isbn), csvCell(buku?.judul), csvCell(buku?.penulis),
+          csvCell(buku?.penerbit), csvCell(buku?.tahun), csvCell(buku?.kelas), csvCell(buku?.mapel),
+          csvCell(item.status), csvCell(item.tanggalInput ? new Date(item.tanggalInput).toLocaleString('id-ID') : '')
+        ].join(','));
+      });
+      const csv = '﻿' + baris.join(String.fromCharCode(10));
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'koleksi_perpustakaan_' + new Date().toISOString().slice(0,10) + '.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      tampilPesan('sukses', 'File CSV berhasil diunduh!');
+    }
+    function csvCell(teks) {
+      if (teks == null) return '';
+      const s = String(teks);
+      if (s.includes(',') || s.includes('"') || s.includes(String.fromCharCode(10))) {
+        return '"' + s.replace(/"/g, '""') + '"';
+      }
+      return s;
+    }
+
+    (function init() {
+      if (!localStorage.getItem(KEY_TABEL_INDUK)) simpanData(KEY_TABEL_INDUK, []);
+      if (!localStorage.getItem(KEY_KOLEKSI)) simpanData(KEY_KOLEKSI, []);
+      console.log('PustakaSMP siap. Data lokal sudah diinisialisasi.');
+    })();
+  </script>
+</body>
+</html>
