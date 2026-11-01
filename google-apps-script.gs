@@ -1,4 +1,7 @@
-const SPREADSHEET_ID = 'ISI_ID_SPREADSHEET_ANDA';
+// Spreadsheet ID: ambil dari URL spreadsheet
+// Contoh URL: https://docs.google.com/spreadsheets/d/1r2p-Afi1JPBk9CO6JVvY3duxDG33S8XDetB-iTTaAW8/edit
+// ID-nya adalah bagian setelah /d/ dan sebelum /edit
+const SPREADSHEET_ID = '1r2p-Afi1JPBk9CO6JVvY3duxDG33S8XDetB-iTTaAW8';
 const SHEET_NAME = 'Sheet1';
 
 function doGet(e) {
