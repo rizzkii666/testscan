@@ -486,7 +486,7 @@
 
       // Cek apakah URL sudah diganti
       if (WEB_APP_URL.includes('XXXXXXXX')) {
-        console.warn('[Google Sheets] Web App URL belum dikonfigurasi. Data hanya tersimpan lokal.');
+        tampilPesan('peringatan', 'Web App URL belum dikonfigurasi. Data hanya tersimpan lokal.');
         return;
       }
 
@@ -529,7 +529,7 @@
         }
       } catch (err) {
         console.error('[Google Sheets] Gagal kirim:', err.message);
-        // Data tetap tersimpan di localStorage, tidak perlu panic
+        tampilPesan('peringatan', 'Gagal kirim ke spreadsheet (' + err.message + '). Data tersimpan lokal saja. Cek console (F12) untuk detail.');
       }
     }
 
